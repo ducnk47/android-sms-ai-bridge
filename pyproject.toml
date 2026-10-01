@@ -32,6 +32,15 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/sms_bridge"]
 
+[tool.hatch.build]
+exclude = [
+    "/.cache",
+    "/.superpowers",
+    "/.venv",
+    "/.worktrees",
+    "/var",
+]
+
 [tool.pytest.ini_options]
 addopts = "-ra"
 asyncio_mode = "auto"
