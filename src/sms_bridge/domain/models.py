@@ -15,3 +15,9 @@ class InboundMessage(BaseModel):
     text: str
     received_at: datetime
 
+
+class ConversationTurn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    user: str
+    assistant: str
