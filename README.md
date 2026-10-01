@@ -24,7 +24,7 @@ Bridge chạy local, không cần public server. Hai tunnel USB tách biệt:
 - Mỗi inbound SMS tạo tối đa một logical response; `sms-gate` có thể tự chia thành multipart SMS.
 - Có echo AI để test toàn bộ vòng lặp trước khi nối model của team.
 - Có fake gateway để chạy Mac-only khi chưa có Android.
-- Chưa có bằng chứng SIM thật; cần chạy physical checkpoint trên Android trước khi coi transport đã được xác nhận.
+- Chưa có bằng chứng SIM thật; bước đó được mô tả trong [transport runbook](docs/test-runbook.md).
 
 ## Chạy test trên Mac, chưa cần Android
 
@@ -56,7 +56,7 @@ curl -X POST http://127.0.0.1:8000/dev/simulate-inbound \
 
 ## Chạy với Xiaomi qua USB
 
-Sau khi cài SMS Gateway for Android, bật Local Server và USB debugging:
+Làm đầy đủ [hướng dẫn Android](docs/setup-android.md), sau đó:
 
 ```bash
 uv run sms-bridge adb-tunnels --device-port 8080

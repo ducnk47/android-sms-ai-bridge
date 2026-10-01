@@ -12,4 +12,4 @@ __pycache__/
 *.log
 *.py[cod]
 var/
-docs/
+docs/superpowers/
