@@ -1,2 +1,16 @@
 .worktrees/
 .superpowers/
+.cache/
+.env
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.py[cod]
+var/
+docs/evidence/*.png
+docs/evidence/*.mp4

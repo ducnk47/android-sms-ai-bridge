@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sms-android-mac-bridge"
+version = "0.1.0"
+description = "Offline-capable Android SMS bridge for a laptop-hosted AI adapter"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "aiosqlite",
+    "fastapi",
+    "httpx",
+    "phonenumbers",
+    "pydantic-settings",
+    "structlog",
+    "uvicorn[standard]",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "respx",
+    "ruff",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sms_bridge"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
