@@ -36,4 +36,3 @@ class Settings(BaseSettings):
     input_max_chars: int = 1_000
     rate_limit_per_minute: int = 6
     log_message_bodies: bool = False
-

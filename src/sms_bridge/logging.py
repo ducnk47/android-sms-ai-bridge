@@ -64,4 +64,3 @@ def configure_logging(*, include_message_bodies: bool = False) -> None:
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=False,
     )
-

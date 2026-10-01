@@ -53,4 +53,3 @@ def test_logging_redacts_secret_fields_and_message_body(capsys) -> None:
     assert "gateway-secret" not in rendered
     assert "webhook-secret" not in rendered
     assert "private cacao question" not in rendered
-

@@ -120,4 +120,3 @@ def test_parse_webhook_rejects_invalid_received_timestamp() -> None:
 
     with pytest.raises(InvalidWebhook):
         parse_sms_received(json.dumps(payload).encode())
-
