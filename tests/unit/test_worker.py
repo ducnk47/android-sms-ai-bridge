@@ -31,9 +31,11 @@ class QueueStore:
 class RecordingProcessor:
     def __init__(self) -> None:
         self.processed: list[PendingWork] = []
+        self.called = asyncio.Event()
 
     async def process(self, work: PendingWork) -> None:
         self.processed.append(work)
+        self.called.set()
 
 
 def _pending() -> PendingWork:
@@ -78,6 +80,37 @@ async def test_run_recovers_before_first_claim_and_stop_is_clean() -> None:
 
     assert store.events[0] == "recover"
     assert "claim" in store.events[1:]
+
+
+async def test_run_immediately_recovers_work_claimed_before_restart(tmp_path) -> None:
+    moment = datetime.now(UTC)
+    store = SqliteStore(tmp_path / "restart.db")
+    await store.initialize()
+    enqueued = await store.enqueue(
+        _inbound("restart", "+84900000001", 0),
+        "alice",
+        moment,
+    )
+    claimed_before_restart = await store.claim_next(moment)
+    assert claimed_before_restart is not None
+    assert claimed_before_restart.request_id == enqueued.request_id
+
+    processor = RecordingProcessor()
+    worker = MessageWorker(
+        store,
+        processor,
+        poll_interval_seconds=0.001,
+        concurrency=1,
+    )
+    task = asyncio.create_task(worker.run())
+    try:
+        await asyncio.wait_for(processor.called.wait(), timeout=0.2)
+    finally:
+        await worker.stop()
+        await asyncio.wait_for(task, timeout=1)
+        await store.close()
+
+    assert [work.request_id for work in processor.processed] == [enqueued.request_id]
 
 
 async def test_cancelling_run_cleans_up_worker_loops() -> None:

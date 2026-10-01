@@ -30,7 +30,10 @@ class MessageWorker:
         return True
 
     async def run(self) -> None:
-        await self._store.recover_stale(datetime.now(UTC))
+        await self._store.recover_stale(
+            datetime.now(UTC),
+            stale_after_seconds=0,
+        )
         loops = [
             asyncio.create_task(self._poll_loop(), name=f"sms-worker-{number}")
             for number in range(self._concurrency)

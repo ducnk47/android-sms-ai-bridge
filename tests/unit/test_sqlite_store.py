@@ -17,6 +17,7 @@ def _inbound(
     source_message_id: str = "gateway-message-01",
     sender: str = "+84901234567",
     text: str | None = None,
+    received_at: datetime = NOW,
 ) -> InboundMessage:
     return InboundMessage(
         request_id=request_id or uuid4(),
@@ -25,7 +26,7 @@ def _inbound(
         device_id="android-01",
         sender=sender,
         text=text or f"question for {event_id}",
-        received_at=NOW,
+        received_at=received_at,
     )
 
 
@@ -245,6 +246,34 @@ async def test_claim_allows_only_one_turn_per_conversation(
     assert second_claim is not None
     assert second_claim.request_id == bob.request_id
     assert third_claim is None
+
+
+async def test_claim_preserves_turn_order_when_device_timestamps_are_reversed(
+    store: SqliteStore,
+) -> None:
+    first = await store.enqueue(
+        _inbound(
+            event_id="alice-1",
+            sender="+84900000001",
+            received_at=NOW + timedelta(seconds=10),
+        ),
+        "alice",
+        NOW,
+    )
+    await store.enqueue(
+        _inbound(
+            event_id="alice-2",
+            sender="+84900000001",
+            received_at=NOW,
+        ),
+        "alice",
+        NOW + timedelta(seconds=1),
+    )
+
+    claimed = await store.claim_next(NOW + timedelta(seconds=2))
+
+    assert claimed is not None
+    assert claimed.request_id == first.request_id
 
 
 async def test_recover_stale_processing_and_sending_work(store: SqliteStore) -> None:

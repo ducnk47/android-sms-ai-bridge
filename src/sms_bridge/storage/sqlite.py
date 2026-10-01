@@ -302,6 +302,13 @@ class SqliteStore:
                           WHERE active.conversation_id = candidate.conversation_id
                             AND active.state IN (?, ?)
                       )
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM inbound_events predecessor
+                          WHERE predecessor.conversation_id = candidate.conversation_id
+                            AND predecessor.turn_id < candidate.turn_id
+                            AND predecessor.state IN (?, ?, ?, ?)
+                      )
                     ORDER BY candidate.received_at, candidate.created_at,
                              candidate.turn_id, candidate.rowid
                     LIMIT 1
@@ -310,6 +317,10 @@ class SqliteStore:
                         MessageState.QUEUED.value,
                         MessageState.ANSWERED.value,
                         MessageState.PROCESSING.value,
+                        MessageState.SENDING.value,
+                        MessageState.QUEUED.value,
+                        MessageState.PROCESSING.value,
+                        MessageState.ANSWERED.value,
                         MessageState.SENDING.value,
                     ),
                 )
