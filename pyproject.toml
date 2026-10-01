@@ -18,6 +18,9 @@ dependencies = [
     "uvicorn[standard]",
 ]
 
+[project.scripts]
+sms-bridge = "sms_bridge.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest",

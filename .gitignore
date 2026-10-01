@@ -12,5 +12,4 @@ __pycache__/
 *.log
 *.py[cod]
 var/
-docs/evidence/*.png
-docs/evidence/*.mp4
+docs/

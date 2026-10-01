@@ -1,81 +1,91 @@
-# Small AI for Development Hackathon — SMS/Voice Access Spike
+# Android SMS ↔ Mac AI Bridge
 
-## Context
-
-- Event: Small AI for Development Hackathon, October 3–4, 2026.
-- Product concept: an offline-capable cacao advisor.
-- This workstream is limited to investigating how farmers reach a teammate-owned AI agent through carrier SMS or voice lines.
-- Target: a credible POC that fits in roughly 20 hours. Do not build or choose the AI/model here.
-
-## Primary technical direction
-
-Build the SMS path first:
+POC Python cho luồng carrier SMS hai chiều:
 
 ```text
-farmer phone
-  -> carrier SMS
-  -> Android phone + active SIM + SMS Gateway for Android (sms-gate)
-  -> USB/ADB port forwarding or local LAN
-  -> laptop integration service
-  -> teammate AI API or laptop-local AI
-  -> reply through sms-gate and the carrier
+điện thoại người dùng
+  → SMS nhà mạng
+  → Xiaomi 14T Pro + SIM + SMS Gateway for Android
+  → USB/ADB
+  → bridge Python trên MacBook
+  → echo adapter hoặc AI adapter
+  → SMS trả về đúng người gửi
 ```
 
-`sms-gate` is only the SMS-to-HTTP/HTTP-to-SMS bridge. It is not the AI. The AI may be local on the laptop or behind an API owned by teammates.
+Bridge chạy local, không cần public server. Hai tunnel USB tách biệt:
 
-Keep two deployment cases explicit:
+- Mac gọi Android Local Server qua `adb forward` (`127.0.0.1:8081` → cổng trên máy Android).
+- Android gọi webhook trên Mac qua `adb reverse` (`127.0.0.1:9876` → `127.0.0.1:8000`).
 
-1. Farmer phone has no Internet, while the backend/laptop may have Internet.
-2. Farmer phone and backend/laptop are both offline; cellular SMS/voice still works. This is the strongest demo if achievable.
+## Trạng thái hiện tại
 
-Do not assume Twilio supports suitable two-way SMS in Vietnam, Côte d'Ivoire, or Papua New Guinea.
+- Webhook `sms:received` có HMAC-SHA256, timestamp chống replay và dedupe.
+- SQLite giữ conversation 30 phút, tối đa 5 turn history và phục hồi sau restart.
+- Mỗi inbound SMS tạo tối đa một logical response; `sms-gate` có thể tự chia thành multipart SMS.
+- Có echo AI để test toàn bộ vòng lặp trước khi nối model của team.
+- Có fake gateway để chạy Mac-only khi chưa có Android.
+- Chưa có bằng chứng SIM thật; cần chạy physical checkpoint trên Android trước khi coi transport đã được xác nhận.
 
-## Optional voice paths
+## Chạy test trên Mac, chưa cần Android
 
-Time-box voice work until SMS succeeds. Accept turn-based voice for the POC; realtime streaming is not required.
+Yêu cầu Python 3.12 và `uv`.
 
-- Android + Bluetooth + Linux/Asterisk `chan_mobile`.
-- A borrowed, verified-working LTE/VoLTE SIP gateway + Asterisk.
+```bash
+uv sync
+uv run pytest
+uv run ruff check src tests
+uv run sms-bridge --help
+```
 
-## Hardware baseline
+Chạy bridge ở fake mode:
 
-- 2 Android phones.
-- 2 active SIMs.
-- 1 laptop.
-- 1 USB cable.
-- Optional local Wi-Fi router/access point.
-- For serious voice testing: Linux Bluetooth/Asterisk or a working VoLTE/SIP gateway.
+```bash
+cp .env.example .env
+uv run uvicorn sms_bridge.main:app --host 127.0.0.1 --port 8000
+```
 
-## Success criteria
+Trong terminal khác, mô phỏng inbound SMS:
 
-- Automated two-way SMS round trip works using real Vietnamese SIMs.
-- The farmer/test phone needs no Internet.
-- Ideally the laptop/backend also needs no Internet.
-- Demo shows the complete request/response path through the teammate AI interface (a stub is acceptable only while isolating the SMS transport).
-- Claims for Côte d'Ivoire and Papua New Guinea are framed as architectural compatibility subject to operator, SIM, device, and service validation—not as proof of deployment there.
+```bash
+curl -X POST http://127.0.0.1:8000/dev/simulate-inbound \
+  -H 'Content-Type: application/json' \
+  -d '{"sender":"0901234567","text":"Cây cacao bị vàng lá","event_id":"demo-1"}'
+```
 
-## Assumptions and boundaries
+`GET /health` kiểm tra process; `GET /ready` kiểm tra cả SQLite và gateway.
 
-- AI/model selection, RAG, cacao knowledge, and answer quality are owned by other teammates.
-- This workstream owns gateway connectivity, message ingestion, AI-interface handoff, correlation, reply delivery, and a reproducible demo.
-- Avoid product implementation before the transport spike answers the high-risk questions.
+## Chạy với Xiaomi qua USB
 
-## Open questions
+Sau khi cài SMS Gateway for Android, bật Local Server và USB debugging:
 
-- Which Android device/OS version and `sms-gate` build are available, and can it become the default SMS app if required?
-- Is USB/ADB forwarding reliable for both the send API and inbound webhook, or is a local Wi-Fi LAN simpler?
-- What exact request/response contract will the teammate AI expose, and what timeout/error behavior should the bridge use?
-- How will multipart SMS, Unicode/Vietnamese text, sender normalization, duplicate delivery, and reply correlation behave?
-- Can the selected SIM/operator send and receive the expected traffic without anti-spam or permission issues?
-- Which voice hardware is actually available, and what is the strict time box after SMS success?
+```bash
+uv run sms-bridge adb-tunnels --device-port 8080
+uv run sms-bridge gateway-health
+uv run sms-bridge register-webhook
+uv run sms-bridge send-test 0901234567 "POC outbound"
+```
 
-## Suggested first spike
+CLI Local Server dùng đúng `GET /health`, `POST /message`, và `POST /webhooks` với Basic Auth. Webhook được đăng ký tới `http://127.0.0.1:9876/webhooks/sms-gate`.
 
-1. Install and configure `sms-gate` on the gateway Android with a real Vietnamese SIM.
-2. Prove laptop-to-phone SMS sending over local connectivity.
-3. Prove inbound SMS reaches a tiny laptop webhook.
-4. Join both directions with a deterministic echo response, recording timestamps and failures.
-5. Replace the echo handler with an adapter for the teammate AI contract while preserving an offline/local option.
-6. Run the full test with Internet disabled on the farmer phone; if feasible, disable laptop Internet too.
+## Cấu hình
 
-Stop after the spike and document evidence before expanding into voice.
+Tạo `.env` từ `.env.example` và điền tối thiểu:
+
+```dotenv
+SMS_BRIDGE_GATEWAY_MODE=local
+SMS_BRIDGE_GATEWAY_BASE_URL=http://127.0.0.1:8081
+SMS_BRIDGE_GATEWAY_USERNAME=<from-android-app>
+SMS_BRIDGE_GATEWAY_PASSWORD=<from-android-app>
+SMS_BRIDGE_WEBHOOK_SIGNING_KEY=<same-key-as-android-app>
+SMS_BRIDGE_HMAC_USER_SECRET=<random-local-secret>
+```
+
+Không commit `.env`, credential, signing key, số điện thoại đầy đủ, ảnh QR, hoặc screenshot có secret. `SMS_BRIDGE_HMAC_USER_SECRET` chỉ dùng tạo user ID ẩn danh trước khi gọi AI.
+
+## Contract AI tối thiểu
+
+AI nhận `request_id`, `conversation_id`, `turn_id`, `user_id` ẩn danh, `message`, `language`, và tối đa 5 turn history. AI không nhận số điện thoại. Response trả cùng `request_id` và một `answer`; bridge giới hạn answer ở 320 Unicode code point.
+
+## Phạm vi
+
+POC hiện ưu tiên SMS. Native Android app/YOLO, HTTP AI thật, voice/Asterisk, cloud deployment và kiểm chứng nhà mạng ngoài Việt Nam là các workstream riêng. Chỉ mở voice spike sau khi physical SMS checkpoint pass.
