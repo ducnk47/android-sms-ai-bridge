@@ -355,7 +355,14 @@ class SqliteStore:
             inbound_column="ai_attempts",
         )
 
-    async def record_answer(self, request_id: UUID, answer: str, now: datetime) -> None:
+    async def record_answer(
+        self,
+        request_id: UUID,
+        answer: str,
+        now: datetime,
+        *,
+        start_sending: bool = False,
+    ) -> None:
         timestamp = _utc_iso(now)
         async with self._lock:
             connection = self._require_connection()
@@ -363,13 +370,16 @@ class SqliteStore:
             try:
                 row = await self._message_row(request_id)
                 self._assert_stored_transition(row, MessageState.ANSWERED)
+                target = (
+                    MessageState.SENDING if start_sending else MessageState.ANSWERED
+                )
                 await connection.execute(
                     """
                     UPDATE inbound_events
                     SET state = ?, answer = ?, updated_at = ?
                     WHERE request_id = ?
                     """,
-                    (MessageState.ANSWERED.value, answer, timestamp, str(request_id)),
+                    (target.value, answer, timestamp, str(request_id)),
                 )
                 await connection.execute(
                     """
@@ -385,7 +395,7 @@ class SqliteStore:
                         str(request_id),
                         row["sender"],
                         answer,
-                        MessageState.ANSWERED.value,
+                        target.value,
                         timestamp,
                     ),
                 )
